@@ -1,5 +1,4 @@
 import BlurHighlight from "@/components/react-bits/blur-highlight"
-import AuroraBlur from "@/components/react-bits/aurora-blur"
 import { LanguageSelector } from "@/components/LanguageSelector"
 
 type Props = {
@@ -22,12 +21,8 @@ export function EditorView({
   const canStart = wordCount > 0
 
   return (
-    <div className="relative min-h-screen overflow-hidden">
-      <div className="pointer-events-none absolute inset-0 opacity-40">
-        <AuroraBlur />
-      </div>
-
-      <div className="relative z-10 mx-auto flex min-h-screen w-full max-w-3xl flex-col gap-6 p-8">
+    <div className="min-h-screen bg-gradient-to-b from-[#0a0a12] via-[#120a1e] to-[#0a0a12]">
+      <div className="mx-auto flex min-h-screen w-full max-w-3xl flex-col gap-6 p-8">
         <header className="flex items-end justify-between">
           <BlurHighlight
             className="font-serif text-5xl tracking-tight text-zinc-100"

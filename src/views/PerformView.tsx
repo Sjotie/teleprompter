@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import SilkWaves from "@/components/react-bits/silk-waves"
 import { ScriptDisplay } from "@/components/ScriptDisplay"
 import { getLanguage } from "@/lib/languages"
 import { tokenize } from "@/lib/tokenize"
@@ -131,26 +130,8 @@ export function PerformView({ script, language, onBack }: Props) {
   }, [language, stopRecognizer])
 
   return (
-    <div className="relative flex min-h-screen flex-col overflow-hidden">
-      <div className="pointer-events-none absolute inset-0 opacity-[0.18]">
-        <SilkWaves
-          speed={0.4}
-          scale={2.5}
-          complexity={0.9}
-          colors={[
-            "#050510",
-            "#0a0a1e",
-            "#14142b",
-            "#1e1e3f",
-            "#2a1f4c",
-            "#3b2560",
-            "#4a2d7a",
-            "#5e3a96",
-          ]}
-        />
-      </div>
-      <div className="relative z-10 flex min-h-screen flex-col">
-      <header className="flex items-center justify-between border-b border-zinc-900/70 bg-zinc-950/40 px-6 py-4 backdrop-blur-sm">
+    <div className="flex min-h-screen flex-col bg-gradient-to-b from-[#0a0a12] via-[#0d0a18] to-[#0a0a12]">
+      <header className="flex items-center justify-between border-b border-zinc-900 bg-zinc-950/60 px-6 py-4">
         <button
           type="button"
           onClick={onBack}
@@ -216,10 +197,9 @@ export function PerformView({ script, language, onBack }: Props) {
         </div>
       </main>
 
-      <footer className="border-t border-zinc-900/70 bg-zinc-950/40 px-6 py-3 text-center text-xs text-zinc-600 backdrop-blur-sm">
+      <footer className="border-t border-zinc-900 bg-zinc-950/60 px-6 py-3 text-center text-xs text-zinc-600">
         Space: toggle mic · ← / → nudge · R reset · Esc exit
       </footer>
-      </div>
     </div>
   )
 }

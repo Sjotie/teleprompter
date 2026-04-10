@@ -17,9 +17,12 @@ export function ScriptDisplay({ tokens, currentIndex }: Props) {
   const activeRef = useRef<HTMLSpanElement | null>(null)
 
   useEffect(() => {
+    // Instant (not smooth) scroll — smooth animations stack up when speech
+    // recognition fires rapid updates, and the highlight transition itself
+    // already provides visual feedback for the motion.
     activeRef.current?.scrollIntoView({
       block: "start",
-      behavior: "smooth",
+      behavior: "auto",
     })
   }, [currentIndex])
 
@@ -41,11 +44,15 @@ export function ScriptDisplay({ tokens, currentIndex }: Props) {
             key={i}
             ref={isActive ? activeRef : null}
             data-index={i}
+            style={
+              isActive
+                ? { textShadow: "0 0 24px rgba(253, 224, 71, 0.45)" }
+                : undefined
+            }
             className={cn(
-              "mr-[0.28em] inline-block scroll-mt-[30vh] transition-all duration-300 ease-out last:mr-0",
+              "mr-[0.28em] inline-block scroll-mt-[30vh] transition-[color,opacity] duration-150 last:mr-0",
               isPast && "text-zinc-600/40",
-              isActive &&
-                "scale-[1.02] text-yellow-200 drop-shadow-[0_0_28px_rgba(253,224,71,0.5)]",
+              isActive && "text-yellow-200",
               !isPast && !isActive && "text-zinc-100",
             )}
           >
