@@ -1,7 +1,7 @@
 import type { Token } from "./tokenize"
 
 /** How far ahead of the current pointer we look for a matching token. */
-export const DEFAULT_LOOKAHEAD = 5
+export const DEFAULT_LOOKAHEAD = 4
 
 /**
  * Given the script tokens, the current pointer (-1 before the first

@@ -62,26 +62,32 @@ export function createRecognizer(opts: RecognizerOptions) {
   recognition.continuous = true
   recognition.interimResults = true
 
-  let lastEmittedWordCount = 0
   let listening = false
 
   recognition.onresult = (event) => {
-    // Collect every word across all results so far.
-    const all: string[] = []
-    for (let i = 0; i < event.results.length; i++) {
-      const alternative = event.results[i][0]
-      if (!alternative) continue
-      const words = alternative.transcript
-        .split(/\s+/)
-        .map(normalize)
-        .filter((w) => w.length > 0)
-      all.push(...words)
+    // Only process results from resultIndex onwards — these are the ones
+    // that are new or have changed since the last event. Iterating from 0
+    // every time causes brittle tracking when Chrome revises interim
+    // results downward (e.g. a 5-word interim finalizes to 4 words), which
+    // otherwise stalls the whole pipeline permanently.
+    //
+    // The matcher is monotonic (it never moves the pointer backwards), so
+    // re-emitting words that have already been matched is harmless — the
+    // fuzzy forward window simply ignores them.
+    const words: string[] = []
+    for (let i = event.resultIndex; i < event.results.length; i++) {
+      const alt = event.results[i][0]
+      if (!alt) continue
+      for (const raw of alt.transcript.split(/\s+/)) {
+        const n = normalize(raw)
+        if (n) words.push(n)
+      }
     }
-    // Emit only the newly added words since the last emit.
-    if (all.length > lastEmittedWordCount) {
-      const fresh = all.slice(lastEmittedWordCount)
-      lastEmittedWordCount = all.length
-      opts.onTranscript(fresh)
+    if (words.length > 0) {
+      if (import.meta.env.DEV) {
+        console.debug("[speech] heard:", words.join(" "))
+      }
+      opts.onTranscript(words)
     }
   }
 
@@ -92,9 +98,10 @@ export function createRecognizer(opts: RecognizerOptions) {
     } else if (err === "language-not-supported") {
       opts.onError("language-not-supported")
     } else if (err === "no-speech") {
-      opts.onError("no-speech")
+      // Don't surface this as a blocking error — Chrome fires it after
+      // every pause. Let onend handle the restart.
     } else if (err === "aborted") {
-      opts.onError("aborted")
+      // Same — aborted often fires during normal operation.
     } else if (err === "network") {
       opts.onError("network")
     } else {
@@ -104,13 +111,20 @@ export function createRecognizer(opts: RecognizerOptions) {
 
   recognition.onend = () => {
     if (listening) {
-      // Unexpected end — auto-restart once.
-      try {
-        recognition.start()
-      } catch {
-        listening = false
-        opts.onStatusChange?.(false)
-      }
+      // Chrome's continuous mode ends itself periodically (after ~20-60s
+      // or on a pause). Restart — but defer slightly so the state machine
+      // has time to transition, otherwise recognition.start() throws
+      // InvalidStateError.
+      setTimeout(() => {
+        if (!listening) return
+        try {
+          recognition.start()
+        } catch {
+          // If it still fails, bail out cleanly.
+          listening = false
+          opts.onStatusChange?.(false)
+        }
+      }, 100)
     } else {
       opts.onStatusChange?.(false)
     }
@@ -118,7 +132,6 @@ export function createRecognizer(opts: RecognizerOptions) {
 
   return {
     start: () => {
-      lastEmittedWordCount = 0
       listening = true
       try {
         recognition.start()

@@ -42,6 +42,7 @@ export function PerformView({ script, language, onBack }: Props) {
   const [currentIndex, setCurrentIndex] = useState(0)
   const [listening, setListening] = useState(false)
   const [error, setError] = useState<SpeechRecognitionErrorKind | null>(null)
+  const [heard, setHeard] = useState<string[]>([])
   const recognizerRef = useRef<Recognizer | null>(null)
   const supported = useMemo(() => isSpeechRecognitionSupported(), [])
   const lang = getLanguage(language)
@@ -60,6 +61,7 @@ export function PerformView({ script, language, onBack }: Props) {
     recognizerRef.current?.stop()
     recognizerRef.current = null
     setListening(false)
+    setHeard([])
   }, [])
 
   const startRecognizer = useCallback(() => {
@@ -71,6 +73,8 @@ export function PerformView({ script, language, onBack }: Props) {
     const rec = createRecognizer({
       lang: language,
       onTranscript: (words) => {
+        // Keep the last ~10 heard words visible as a debug readout.
+        setHeard((prev) => [...prev, ...words].slice(-10))
         // The matcher operates on "last matched" pointer. currentIndex
         // tracks "next to read" — so feed it i-1 and add 1 back.
         setCurrentIndex((i) => {
@@ -188,6 +192,17 @@ export function PerformView({ script, language, onBack }: Props) {
       {error && (
         <div className="border-b border-red-900/40 bg-red-950/30 px-6 py-3 text-center text-sm text-red-300">
           {ERROR_MESSAGES[error]}
+        </div>
+      )}
+
+      {listening && (
+        <div className="border-b border-zinc-900 bg-zinc-950/60 px-6 py-2 text-center font-mono text-xs text-zinc-500">
+          <span className="mr-2 text-zinc-600">heard:</span>
+          {heard.length === 0 ? (
+            <span className="italic text-zinc-700">…waiting for speech…</span>
+          ) : (
+            heard.join(" ")
+          )}
         </div>
       )}
 

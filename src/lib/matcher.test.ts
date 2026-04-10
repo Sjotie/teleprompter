@@ -26,7 +26,7 @@ describe("findNextMatch", () => {
 
   test("tolerates a single skipped word inside the lookahead window", () => {
     const tokens = tokenize("hello world how are you")
-    // Skipping "world" and going straight to "how" — within default N=5.
+    // Skipping "world" and going straight to "how" — within default N=4.
     expect(findNextMatch(tokens, 0, ["how"])).toBe(2)
   })
 
@@ -61,7 +61,7 @@ describe("findNextMatch", () => {
 
   test("does not advance beyond lookahead window", () => {
     const tokens = tokenize("one two three four five six seven eight")
-    // At -1, speaking "seven" (index 6, distance 7) is beyond N=5 window.
+    // At -1, speaking "seven" (index 6) is beyond the N=4 window (0..3).
     expect(findNextMatch(tokens, -1, ["seven"])).toBe(-1)
   })
 })
