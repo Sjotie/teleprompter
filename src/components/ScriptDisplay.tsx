@@ -8,16 +8,17 @@ type Props = {
 }
 
 /**
- * Renders a script as a sequence of word spans, highlighting the current
- * word and dimming past words. Auto-scrolls the active word into the
- * reading zone whenever currentIndex changes.
+ * Renders a script as a sequence of word spans, highlighting the word
+ * the user is *about to read* (not the one just spoken). Auto-scrolls the
+ * active word to sit at ~30% from the top of the scroll container so there
+ * is plenty of upcoming text visible below it.
  */
 export function ScriptDisplay({ tokens, currentIndex }: Props) {
   const activeRef = useRef<HTMLSpanElement | null>(null)
 
   useEffect(() => {
     activeRef.current?.scrollIntoView({
-      block: "center",
+      block: "start",
       behavior: "smooth",
     })
   }, [currentIndex])
@@ -41,15 +42,14 @@ export function ScriptDisplay({ tokens, currentIndex }: Props) {
             ref={isActive ? activeRef : null}
             data-index={i}
             className={cn(
-              "inline-block transition-all duration-300 ease-out",
-              isPast && "text-zinc-600/50",
+              "mr-[0.28em] inline-block scroll-mt-[30vh] transition-all duration-300 ease-out last:mr-0",
+              isPast && "text-zinc-600/40",
               isActive &&
-                "scale-[1.02] text-yellow-200 drop-shadow-[0_0_24px_rgba(253,224,71,0.4)]",
+                "scale-[1.02] text-yellow-200 drop-shadow-[0_0_28px_rgba(253,224,71,0.5)]",
               !isPast && !isActive && "text-zinc-100",
             )}
           >
             {token.text}
-            {i < tokens.length - 1 && " "}
           </span>
         )
       })}

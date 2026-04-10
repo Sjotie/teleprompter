@@ -37,26 +37,25 @@ export function PerformView({ script, language, onBack }: Props) {
   const tokensRef = useRef(tokens)
   tokensRef.current = tokens
 
-  const [currentIndex, setCurrentIndex] = useState(-1)
+  // currentIndex = "the word the user is about to read".
+  // Before anything is said, that's word 0 (highlighted, ready to go).
+  // After speaking word 0, it advances to 1, and so on.
+  const [currentIndex, setCurrentIndex] = useState(0)
   const [listening, setListening] = useState(false)
   const [error, setError] = useState<SpeechRecognitionErrorKind | null>(null)
   const recognizerRef = useRef<Recognizer | null>(null)
   const supported = useMemo(() => isSpeechRecognitionSupported(), [])
   const lang = getLanguage(language)
 
-  const nudge = useCallback(
-    (delta: number) => {
-      setCurrentIndex((i) => {
-        const next = i + delta
-        if (next < -1) return -1
-        if (next > tokensRef.current.length - 1)
-          return tokensRef.current.length - 1
-        return next
-      })
-    },
-    [],
-  )
-  const reset = useCallback(() => setCurrentIndex(-1), [])
+  const nudge = useCallback((delta: number) => {
+    setCurrentIndex((i) => {
+      const next = i + delta
+      if (next < 0) return 0
+      if (next > tokensRef.current.length) return tokensRef.current.length
+      return next
+    })
+  }, [])
+  const reset = useCallback(() => setCurrentIndex(0), [])
 
   const stopRecognizer = useCallback(() => {
     recognizerRef.current?.stop()
@@ -73,9 +72,16 @@ export function PerformView({ script, language, onBack }: Props) {
     const rec = createRecognizer({
       lang: language,
       onTranscript: (words) => {
-        setCurrentIndex((i) =>
-          findNextMatch(tokensRef.current, i, words),
-        )
+        // The matcher operates on "last matched" pointer. currentIndex
+        // tracks "next to read" — so feed it i-1 and add 1 back.
+        setCurrentIndex((i) => {
+          const lastMatched = findNextMatch(
+            tokensRef.current,
+            i - 1,
+            words,
+          )
+          return lastMatched + 1
+        })
       },
       onError: (err) => {
         setError(err)
@@ -204,7 +210,7 @@ export function PerformView({ script, language, onBack }: Props) {
         </div>
       )}
 
-      <main className="flex flex-1 items-center justify-center overflow-y-auto px-8 py-[40vh]">
+      <main className="flex-1 overflow-y-auto px-8 pt-[30vh] pb-[70vh]">
         <div className="mx-auto max-w-3xl text-center">
           <ScriptDisplay tokens={tokens} currentIndex={currentIndex} />
         </div>
