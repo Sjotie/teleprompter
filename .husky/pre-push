@@ -1,0 +1,7 @@
+#!/usr/bin/env sh
+# Full-history scan before anything leaves the machine.
+if ! command -v gitleaks >/dev/null 2>&1; then
+  echo "❌ gitleaks is not installed. Run: brew install gitleaks"
+  exit 1
+fi
+gitleaks detect --redact --no-banner --config .gitleaks.toml

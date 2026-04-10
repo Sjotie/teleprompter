@@ -1,0 +1,219 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import SilkWaves from "@/components/react-bits/silk-waves"
+import { ScriptDisplay } from "@/components/ScriptDisplay"
+import { getLanguage } from "@/lib/languages"
+import { tokenize } from "@/lib/tokenize"
+import { findNextMatch } from "@/lib/matcher"
+import {
+  createRecognizer,
+  isSpeechRecognitionSupported,
+  type SpeechRecognitionErrorKind,
+} from "@/lib/speech"
+import { cn } from "@/lib/utils"
+
+type Props = {
+  script: string
+  language: string
+  onBack: () => void
+}
+
+type Recognizer = { start: () => void; stop: () => void }
+
+const ERROR_MESSAGES: Record<SpeechRecognitionErrorKind, string> = {
+  "not-supported":
+    "Speech recognition isn't supported in this browser — open in Chrome or Edge.",
+  "not-allowed":
+    "Microphone access was blocked. Allow mic permissions for this site and retry.",
+  "language-not-supported":
+    "Your browser doesn't support recognition for this language. Try English.",
+  "no-speech": "No speech detected — click the mic again when you're ready.",
+  aborted: "Recognition was interrupted. Click the mic to resume.",
+  network: "Network error reaching the speech service. Check your connection.",
+  unknown: "Something went wrong with speech recognition.",
+}
+
+export function PerformView({ script, language, onBack }: Props) {
+  const tokens = useMemo(() => tokenize(script), [script])
+  const tokensRef = useRef(tokens)
+  tokensRef.current = tokens
+
+  const [currentIndex, setCurrentIndex] = useState(-1)
+  const [listening, setListening] = useState(false)
+  const [error, setError] = useState<SpeechRecognitionErrorKind | null>(null)
+  const recognizerRef = useRef<Recognizer | null>(null)
+  const supported = useMemo(() => isSpeechRecognitionSupported(), [])
+  const lang = getLanguage(language)
+
+  const nudge = useCallback(
+    (delta: number) => {
+      setCurrentIndex((i) => {
+        const next = i + delta
+        if (next < -1) return -1
+        if (next > tokensRef.current.length - 1)
+          return tokensRef.current.length - 1
+        return next
+      })
+    },
+    [],
+  )
+  const reset = useCallback(() => setCurrentIndex(-1), [])
+
+  const stopRecognizer = useCallback(() => {
+    recognizerRef.current?.stop()
+    recognizerRef.current = null
+    setListening(false)
+  }, [])
+
+  const startRecognizer = useCallback(() => {
+    if (!supported) {
+      setError("not-supported")
+      return
+    }
+    setError(null)
+    const rec = createRecognizer({
+      lang: language,
+      onTranscript: (words) => {
+        setCurrentIndex((i) =>
+          findNextMatch(tokensRef.current, i, words),
+        )
+      },
+      onError: (err) => {
+        setError(err)
+        if (err === "not-allowed" || err === "not-supported") {
+          stopRecognizer()
+        }
+      },
+      onStatusChange: (isListening) => {
+        setListening(isListening)
+      },
+    })
+    recognizerRef.current = rec
+    rec.start()
+  }, [language, supported, stopRecognizer])
+
+  const toggleMic = useCallback(() => {
+    if (listening) stopRecognizer()
+    else startRecognizer()
+  }, [listening, startRecognizer, stopRecognizer])
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "ArrowRight") nudge(1)
+      else if (e.key === "ArrowLeft") nudge(-1)
+      else if (e.key === "r" || e.key === "R") reset()
+      else if (e.key === "Escape") onBack()
+      else if (e.key === " ") {
+        e.preventDefault()
+        toggleMic()
+      }
+    }
+    window.addEventListener("keydown", onKey)
+    return () => window.removeEventListener("keydown", onKey)
+  }, [nudge, reset, onBack, toggleMic])
+
+  useEffect(() => {
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden") stopRecognizer()
+    }
+    document.addEventListener("visibilitychange", onVisibility)
+    return () => document.removeEventListener("visibilitychange", onVisibility)
+  }, [stopRecognizer])
+
+  useEffect(() => {
+    // Stop recognizer on unmount and when language changes.
+    return () => stopRecognizer()
+  }, [language, stopRecognizer])
+
+  return (
+    <div className="relative flex min-h-screen flex-col overflow-hidden">
+      <div className="pointer-events-none absolute inset-0 opacity-[0.18]">
+        <SilkWaves
+          speed={0.4}
+          scale={2.5}
+          complexity={0.9}
+          colors={[
+            "#050510",
+            "#0a0a1e",
+            "#14142b",
+            "#1e1e3f",
+            "#2a1f4c",
+            "#3b2560",
+            "#4a2d7a",
+            "#5e3a96",
+          ]}
+        />
+      </div>
+      <div className="relative z-10 flex min-h-screen flex-col">
+      <header className="flex items-center justify-between border-b border-zinc-900/70 bg-zinc-950/40 px-6 py-4 backdrop-blur-sm">
+        <button
+          type="button"
+          onClick={onBack}
+          className="text-sm text-zinc-400 transition-colors hover:text-zinc-100"
+        >
+          ← Editor
+        </button>
+        <div className="flex items-center gap-2 rounded-full border border-zinc-800 bg-zinc-950 px-3 py-1 text-xs text-zinc-400">
+          <span>{lang.flag}</span>
+          <span>{lang.label}</span>
+        </div>
+        <div className="flex items-center gap-2 text-sm">
+          <button
+            type="button"
+            onClick={() => nudge(-1)}
+            className="rounded-md border border-zinc-800 px-3 py-1 text-zinc-400 transition-colors hover:border-zinc-600 hover:text-zinc-100"
+            aria-label="Previous word"
+          >
+            ←
+          </button>
+          <button
+            type="button"
+            onClick={reset}
+            className="rounded-md border border-zinc-800 px-3 py-1 text-zinc-400 transition-colors hover:border-zinc-600 hover:text-zinc-100"
+          >
+            Reset
+          </button>
+          <button
+            type="button"
+            onClick={() => nudge(1)}
+            className="rounded-md border border-zinc-800 px-3 py-1 text-zinc-400 transition-colors hover:border-zinc-600 hover:text-zinc-100"
+            aria-label="Next word"
+          >
+            →
+          </button>
+          <button
+            type="button"
+            onClick={toggleMic}
+            disabled={!supported}
+            className={cn(
+              "ml-2 rounded-md border px-4 py-1 font-medium transition-all",
+              listening
+                ? "border-red-500/50 bg-red-500/10 text-red-400 shadow-[0_0_16px_rgba(239,68,68,0.3)]"
+                : "border-purple-500/50 bg-purple-500/10 text-purple-300 hover:bg-purple-500/20",
+              !supported && "cursor-not-allowed opacity-40",
+            )}
+            aria-label={listening ? "Stop microphone" : "Start microphone"}
+          >
+            {listening ? "● Listening" : "🎙 Mic"}
+          </button>
+        </div>
+      </header>
+
+      {error && (
+        <div className="border-b border-red-900/40 bg-red-950/30 px-6 py-3 text-center text-sm text-red-300">
+          {ERROR_MESSAGES[error]}
+        </div>
+      )}
+
+      <main className="flex flex-1 items-center justify-center overflow-y-auto px-8 py-[40vh]">
+        <div className="mx-auto max-w-3xl text-center">
+          <ScriptDisplay tokens={tokens} currentIndex={currentIndex} />
+        </div>
+      </main>
+
+      <footer className="border-t border-zinc-900/70 bg-zinc-950/40 px-6 py-3 text-center text-xs text-zinc-600 backdrop-blur-sm">
+        Space: toggle mic · ← / → nudge · R reset · Esc exit
+      </footer>
+      </div>
+    </div>
+  )
+}

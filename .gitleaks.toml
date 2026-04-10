@@ -1,0 +1,26 @@
+# Gitleaks config for teleprompter
+# Extends the default ruleset and adds a custom rule for the
+# React Bits Pro license key format (RBPU-XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX).
+#
+# The default ruleset catches common secrets (AWS, GitHub, Stripe, etc.);
+# the custom rule catches *our* specific leak vector.
+
+title = "teleprompter"
+
+[extend]
+useDefault = true
+
+[[rules]]
+id = "reactbits-pro-license-key"
+description = "React Bits Pro license key"
+regex = '''RBPU-[A-F0-9]{8}-[A-F0-9]{4}-[A-F0-9]{4}-[A-F0-9]{4}-[A-F0-9]{12}'''
+tags = ["key", "reactbits"]
+
+[allowlist]
+description = "Allow fake/example patterns used in documentation and tests"
+regexes = [
+  '''RBPU-AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA''',
+]
+paths = [
+  '''\.gitleaks\.toml''',
+]
