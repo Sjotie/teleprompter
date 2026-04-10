@@ -36,9 +36,13 @@ export function PerformView({ script, language, onBack }: Props) {
   const tokensRef = useRef(tokens)
   tokensRef.current = tokens
 
-  // currentIndex = "the word the user is about to read".
-  // Before anything is said, that's word 0 (highlighted, ready to go).
-  // After speaking word 0, it advances to 1, and so on.
+  // Two-stage pointer:
+  // - targetIndex is "the word the speaker has reached" — updated
+  //   instantly from speech recognition or manual nudges.
+  // - currentIndex is "the word the display is currently showing" —
+  //   walks smoothly toward targetIndex at a fixed rate so bursty
+  //   multi-word recognition events don't cause visual leaps.
+  const [targetIndex, setTargetIndex] = useState(0)
   const [currentIndex, setCurrentIndex] = useState(0)
   const [listening, setListening] = useState(false)
   const [error, setError] = useState<SpeechRecognitionErrorKind | null>(null)
@@ -47,22 +51,52 @@ export function PerformView({ script, language, onBack }: Props) {
   const supported = useMemo(() => isSpeechRecognitionSupported(), [])
   const lang = getLanguage(language)
 
-  const nudge = useCallback((delta: number) => {
-    setCurrentIndex((i) => {
-      const next = i + delta
-      if (next < 0) return 0
-      if (next > tokensRef.current.length) return tokensRef.current.length
-      return next
-    })
+  const clamp = useCallback((n: number) => {
+    if (n < 0) return 0
+    if (n > tokensRef.current.length) return tokensRef.current.length
+    return n
   }, [])
-  const reset = useCallback(() => setCurrentIndex(0), [])
+
+  const nudge = useCallback(
+    (delta: number) => {
+      // Manual nudges move both pointers in lockstep — no smoothing,
+      // the user expects an immediate response.
+      setTargetIndex((i) => clamp(i + delta))
+      setCurrentIndex((i) => clamp(i + delta))
+    },
+    [clamp],
+  )
+  const reset = useCallback(() => {
+    setTargetIndex(0)
+    setCurrentIndex(0)
+  }, [])
+
+  // Tick the display toward the target. 80 ms per word gives a smooth
+  // word-by-word animation for normal reading, and we snap directly for
+  // large gaps (> 6 words) so a fast reader doesn't accumulate lag.
+  useEffect(() => {
+    if (currentIndex === targetIndex) return
+    const gap = Math.abs(targetIndex - currentIndex)
+    if (gap > 6) {
+      setCurrentIndex(targetIndex)
+      return
+    }
+    const step = targetIndex > currentIndex ? 1 : -1
+    const id = window.setTimeout(() => {
+      setCurrentIndex((c) => c + step)
+    }, 80)
+    return () => window.clearTimeout(id)
+  }, [targetIndex, currentIndex])
 
   const stopRecognizer = useCallback(() => {
     recognizerRef.current?.stop()
     recognizerRef.current = null
     setListening(false)
     setHeard([])
-  }, [])
+    // Sync target to wherever the display is so the next start is not
+    // fighting a stale target.
+    setTargetIndex(currentIndex)
+  }, [currentIndex])
 
   const startRecognizer = useCallback(() => {
     if (!supported) {
@@ -75,12 +109,12 @@ export function PerformView({ script, language, onBack }: Props) {
       onTranscript: (words) => {
         // Keep the last ~10 heard words visible as a debug readout.
         setHeard((prev) => [...prev, ...words].slice(-10))
-        // The matcher operates on "last matched" pointer. currentIndex
-        // tracks "next to read" — so feed it i-1 and add 1 back.
-        setCurrentIndex((i) => {
+        // The matcher operates on a "last matched" pointer. The target
+        // tracks "next to read" — so feed it target-1 and add 1 back.
+        setTargetIndex((t) => {
           const lastMatched = findNextMatch(
             tokensRef.current,
-            i - 1,
+            t - 1,
             words,
           )
           return lastMatched + 1
